@@ -3,3 +3,5 @@ transformers
 sentencepiece
 tqdm
 scipy
+torch
+accelerate

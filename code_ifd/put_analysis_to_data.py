@@ -54,7 +54,7 @@ def main():
 
     print('New data len \n',len(new_data))
     with open(args.json_save_path, "w") as fw:
-        json.dump(new_data, fw, indent=4)
+        json.dump(new_data, fw, indent=4, ensure_ascii=False)
     
 
 if __name__ == '__main__':

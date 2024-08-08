@@ -36,7 +36,7 @@ def do_ifd(args, json_data):
         return (1, x[args.key_name]) 
     
     # The types for the ifd filtering
-    # 1. Given the ifd_num, choose the highese ifd_num samples
+    # 1. Given the ifd_num, choose the highes ifd_num samples
     # 2. Not given the ifd_num, choose between bounds
 
     # Both the above needs to define the ifd_lupper
@@ -124,7 +124,7 @@ def main():
     parser.add_argument("--ifd_lupper", type=float, default=1.0, help='the upper bound for ifd filtering')
     parser.add_argument("--key_name", type=str, default='ifd_ppl',help='ifd_ppl')
 
-    parser.add_argument("--emb_model", type=str, default='sentence-transformers/all-MiniLM-L6-v2')
+    parser.add_argument("--emb_model", type=str, default='code_diversity_fla/all-MiniLM-L6-v2')
     parser.add_argument("--emb_type", type=str, default='whole', help='whole, instruction, response')
     parser.add_argument("--batch_size", type=int, default=64)
 

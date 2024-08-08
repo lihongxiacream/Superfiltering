@@ -35,7 +35,8 @@ def main():
     new_data = new_data[:sample_num]
     print(len(new_data))
     with open(args.json_save_path, 'w') as file:
-        json.dump(new_data, file, indent=4)
+        for i in new_data:
+            file.write(json.dumps(i,ensure_ascii=False)+'\n')
     
     print('Done: Data Selection:',args.json_data_path)
 

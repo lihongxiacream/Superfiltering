@@ -9,13 +9,13 @@ PROMPT_DICT_ALPACA = {
     "prompt_input": (
         "Below is an instruction that describes a task, paired with an input that provides further context. "
         "Write a response that appropriately completes the request.\n\n"
-        "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:"
+        "<|im_start|>system\n{{instruction}}<|im_end|>\n<|im_start|>user\n{{input}}<|im_end|>\n<|im_start|>assistant\n"
     ),
     "prompt_no_input": (
         "Below is an instruction that describes a task. "
         "Write a response that appropriately completes the request.\n\n"
-        "### Instruction:\n{instruction}\n\n### Response:"
-    ),
+        "<|im_start|>user\n{{instruction}}<|im_end|>\n<|im_start|>assistant\n"
+    )
 }
 PROMPT_DICT_WIZARDLM = {
     "prompt_input": (
