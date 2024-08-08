@@ -15,6 +15,8 @@ class Superfiltering_IFD():
         self.sample_rate = sample_rate #每组数据要多少比例
         self.json_save_path = json_save_path
         self.data_type = multi_data #Alpaca or Sharegpt 单轮还是多轮
+        if self.data_type not in ['Alpaca','Sharegpt']:
+            raise ValueError('data_type must be Alpaca or Sharegpt')
         self.PROMPT_DICT_NONE = {
         "prompt_input": (
             "{instruction}\n{input}\n"
@@ -31,7 +33,7 @@ class Superfiltering_IFD():
     def parse_args(self):
         parser = argparse.ArgumentParser()
         #parser.add_argument("--data_path", type=str, default='data/alpaca_data/alpaca_data.json')
-        parser.add_argument("--save_path", type=str, default='debug.jsonl')
+        parser.add_argument("--save_path", type=str, default='./debug.jsonl')
         #parser.add_argument("--model_name_or_path", type=str, default='gpt2')
         parser.add_argument("--max_length", type=int, default=1024)
         parser.add_argument("--start_idx", type=int, default=0)
@@ -91,17 +93,22 @@ class Superfiltering_IFD():
             for j in conv['conversations']:
                 if j['from'] == 'human':
                     result.append({})
-                    if conv.get('system'):
-                        result[-1]['instruction'] = conv['system']
-                        result[-1]['input'] = j['value']
-                    else:
-                        result[-1]['instruction'] = j['value']
-                        result[-1]['input'] = ""
+                    # if conv.get('system'):
+                    #     result[-1]['instruction'] = conv['system']
+                    #     result[-1]['input'] = j['value']
+                    # else:
+                    result[-1]['instruction'] = j['value']
+                    result[-1]['input'] = ""
                 else:
                     result[-1]['output'] = j['value']
                     result[-1]['ID'] = i
-                    result[-1]['category'] = conv['category']
+                    result[-1]['category'] = conv['category'] if conv.get('category') else 'None'
+
         print(len(data),len(result))
+        # with open("./process_data.jsonl", 'w') as file:
+        #     json.dump(result, file, indent=4, ensure_ascii=False)
+        return result
+
     def select_data_multi(self,json_data):
         args = self.parse_args()
         print("------------开始基于IFD值筛选多轮问答数据-------------")
@@ -121,6 +128,8 @@ class Superfiltering_IFD():
 
             elif instruct['category'] == 'math':
                 prompt = "Answer the grade school math word problem below, using step-by-step problem-solving process. Print the final answer after."
+            else:
+                prompt=''
 
             if instruct['input'] != '':
                 prompt = instruct['instruction']
@@ -150,7 +159,7 @@ class Superfiltering_IFD():
                 return (0, 0)
             return (1, x[args.key_name])
 
-        print(len(result_conv))
+        #print(len(result_conv))
         # print(result_conv['math'][-1])
         # print(len(result_conv['roleplay']), len(result_conv['code']), len(result_conv['math']))
 
@@ -167,7 +176,7 @@ class Superfiltering_IFD():
             new_data = new_data[:sample_num]
             final_result += new_data
 
-        #print(len(final_result))
+        print(len(final_result))
 
         with open(self.json_save_path, 'w') as file:
             json.dump(final_result, file, indent=4, ensure_ascii=False)
@@ -188,14 +197,14 @@ class Superfiltering_IFD():
                          (isinstance(x[args.key_name], (int, float)) and x[args.key_name] < args.filter_threash)]
         new_data = sorted(filtered_data, key=sort_key, reverse=True)
 
-        sample_num = int(len(new_data) * self.sample_rate)
+        sample_num = int(len(json_data) * self.sample_rate)
         new_data = new_data[:sample_num]
         print(len(new_data))
-        with open(args.json_save_path, 'w') as file:
+        with open(self.json_save_path, 'w') as file:
             for i in new_data:
                 file.write(json.dumps(i, ensure_ascii=False) + '\n')
 
-        print('Done: Data Selection:', args.json_data_path)
+        print('Done: Data Selection:', self.json_save_path)
 
     def run(self):
 
@@ -207,6 +216,7 @@ class Superfiltering_IFD():
 
         model.eval()
 
+        print("------------模型加载结束--------------")
         #判断一下输入是否是列表 不是列表的话按行读入
         with open(self.data_path, "r") as f:
             data = json.load(f)
@@ -218,7 +228,7 @@ class Superfiltering_IFD():
                     data.append(json.loads(line.strip()))
 
         #判断是否是多轮问答数据，是的话预处理成单轮问答
-        if self.data_type=="sharegpt":
+        if self.data_type=="Sharegpt":
             data=self.preprocess_multi(data)
 
         start_idx = args.start_idx
@@ -233,7 +243,7 @@ class Superfiltering_IFD():
         #     exsisting_num =  sum(1 for _ in file)
         # sampled_data = sampled_data[exsisting_num:]
 
-
+        print("----------数据读取完成----------")
         if args.prompt == 'none':
             prompt_no_input = self.PROMPT_DICT_NONE["prompt_no_input"]
             prompt_input = self.PROMPT_DICT_NONE["prompt_input"]
@@ -260,7 +270,7 @@ class Superfiltering_IFD():
                 instruct_i = promt_to_use
 
 
-            instruct_i_input_ids = tokenizer.encode(instruct_i, return_tensors="pt", truncation=True, max_length=args.max_length).to(device)
+            instruct_i_input_ids = tokenizer.encode(instruct_i, return_tensors="pt", truncation=True, max_length=args.max_length).to(self.device)
             instruct_i_len = instruct_i_input_ids.shape[1]
 
             if output_i == '':
@@ -274,37 +284,41 @@ class Superfiltering_IFD():
                 temp_data_i['loss'] = [0,loss_out_alone,0,loss_out_condition]
 
             pt_data.append(temp_data_i)
+            with open(args.save_path, "a") as file:
+                file.write(json.dumps(temp_data_i) + '\n')
 
-            assert len(data) == len(pt_data)
-            #put analysis to data
-            new_data = []
-            for i in tqdm(range(len(pt_data))):
+        print("-------IFD值插入数据----------")
 
-                json_data_i = data[i]
+        assert len(sampled_data) == len(pt_data)
+        #put analysis to data
+        new_data = []
+        for i in tqdm(range(len(pt_data))):
 
-                pt_data_i = pt_data[i]
-                if pt_data_i == {}:
-                    ppl_Q_direct, ppl_A_direct, ppl_Q_condition, ppl_A_condition = np.nan, np.nan, np.nan, np.nan
-                    loss_Q_direct, loss_A_direct, loss_Q_condition, loss_A_condition = np.nan, np.nan, np.nan, np.nan
-                else:
-                    ppl_Q_direct, ppl_A_direct, ppl_Q_condition, ppl_A_condition = \
-                        pt_data_i['ppl'][0], pt_data_i['ppl'][1], pt_data_i['ppl'][2], pt_data_i['ppl'][3]
-                    loss_Q_direct, loss_A_direct, loss_Q_condition, loss_A_condition = \
-                        pt_data_i['loss'][0], pt_data_i['loss'][1], pt_data_i['loss'][2], pt_data_i['loss'][3]
+            json_data_i = sampled_data[i]
 
-                json_data_i['ppl_A_direct'] = ppl_A_direct
-                json_data_i['ppl_A_condition'] = ppl_A_condition
-                try:
-                    json_data_i['ifd_ppl'] = ppl_A_condition / ppl_A_direct
-                except ZeroDivisionError:
-                    json_data_i['ifd_ppl'] = 0
+            pt_data_i = pt_data[i]
+            if pt_data_i == {}:
+                ppl_Q_direct, ppl_A_direct, ppl_Q_condition, ppl_A_condition = np.nan, np.nan, np.nan, np.nan
+                loss_Q_direct, loss_A_direct, loss_Q_condition, loss_A_condition = np.nan, np.nan, np.nan, np.nan
+            else:
+                ppl_Q_direct, ppl_A_direct, ppl_Q_condition, ppl_A_condition = \
+                    pt_data_i['ppl'][0], pt_data_i['ppl'][1], pt_data_i['ppl'][2], pt_data_i['ppl'][3]
+                loss_Q_direct, loss_A_direct, loss_Q_condition, loss_A_condition = \
+                    pt_data_i['loss'][0], pt_data_i['loss'][1], pt_data_i['loss'][2], pt_data_i['loss'][3]
 
-                new_data.append(json_data_i)
-            # with open(args.save_path, "a") as file:
-            #     file.write(json.dumps(temp_data_i) + '\n')
+            json_data_i['ppl_A_direct'] = ppl_A_direct
+            json_data_i['ppl_A_condition'] = ppl_A_condition
+            try:
+                json_data_i['ifd_ppl'] = ppl_A_condition / ppl_A_direct
+            except ZeroDivisionError:
+                json_data_i['ifd_ppl'] = 0
+
+            new_data.append(json_data_i)
+
+        with open("postprocess_data", "a") as file:
+            file.write(json.dumps(new_data) + '\n')
 
         if self.data_type=='Sharegpt':
             self.select_data_multi(new_data)
         else:
             self.select_data(new_data)
-        print('Done: Data Analysis:',args.data_path)
